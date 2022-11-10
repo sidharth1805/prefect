@@ -73,3 +73,11 @@ async def test_configure_client(config_file):
     context_dict = list_kube_config_contexts(config_file=str(config_file))
     current_context = context_dict[1]["name"]
     assert cluster_config.context_name == current_context
+
+async def test_set_current_context(config_file):
+    cluster_config = KubernetesClusterConfig.from_file(path=config_file)
+    cluster_config.configure_client()
+    cluster_config.set_current_context(context_name="some-context")
+    
+    assert cluster_config.context_name == "some-context"
+    assert cluster_config.config["current-context"] == "some-context"

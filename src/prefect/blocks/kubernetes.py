@@ -99,3 +99,11 @@ class KubernetesClusterConfig(Block):
         kubernetes.config.kube_config.load_kube_config_from_dict(
             config_dict=self.config, context=self.context_name
         )
+
+    def set_current_context(self, context_name: str) -> None:
+        """
+        Sets the current Kubernetes context for this cluster configuration.
+        """
+        self.config['current-context'] = context_name
+        self.context_name = context_name
+        
