@@ -34,8 +34,6 @@ async def open_process(command: List[str], **kwargs):
     #     command = " ".join(command)
    
     if sys.platform == "win32":
-        print(command)
-        print("CWD is" + kwargs.get("cwd")) 
         exec_process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=kwargs.get("stdout"),
