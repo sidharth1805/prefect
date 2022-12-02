@@ -1,3 +1,4 @@
+import asyncio
 import os
 import signal
 import subprocess
@@ -29,10 +30,27 @@ async def open_process(command: List[str], **kwargs):
             "The command passed to open process must be a list. You passed the command"
             f"'{command}', which is type '{type(command)}'."
         )
+    # if sys.platform == "win32":
+    #     command = " ".join(command)
+   
     if sys.platform == "win32":
-        command = " ".join(command)
-
-    process = await anyio.open_process(command, **kwargs)
+        print(command)
+        print("CWD is" + kwargs.get("cwd")) 
+        exec_process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=kwargs.get("stdout"),
+                stderr=kwargs.get("stderr"),
+                cwd=kwargs.get("cwd"),
+                env=kwargs.get("env"),
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        
+        import anyio._backends._asyncio
+        stdout_stream = anyio._backends._asyncio.StreamReaderWrapper(exec_process.stdout) if exec_process.stdout else None
+        stderr_stream = anyio._backends._asyncio.StreamReaderWrapper(exec_process.stderr) if exec_process.stderr else None
+        process = anyio._backends._asyncio.Process(exec_process, _stdin=None, _stdout=stdout_stream, _stderr=stderr_stream)
+    else:
+        process = await anyio.open_process(command, **kwargs)
 
     try:
         async with process:
