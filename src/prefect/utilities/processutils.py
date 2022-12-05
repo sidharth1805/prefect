@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 import os
 import signal
 import subprocess
@@ -12,6 +13,21 @@ import anyio.abc
 from anyio.streams.text import TextReceiveStream, TextSendStream
 
 TextSink = Union[anyio.AsyncFile, TextIO, TextSendStream]
+
+
+def ctrl_c_handler(process: anyio.abc.Process):
+    """
+    A Windows CTRL-C handler that accepts any anyio subprocess
+    and terminates it before passing control to the next handler
+    """
+    def handler(*args):
+        # send signal using os.kill to avoid anyio's signal handling
+        os.kill(process.pid, signal.CTRL_BREAK_EVENT)
+        
+        # return False to allow the next handler to be called
+        return False
+
+    return handler
 
 
 @asynccontextmanager
@@ -30,23 +46,37 @@ async def open_process(command: List[str], **kwargs):
             "The command passed to open process must be a list. You passed the command"
             f"'{command}', which is type '{type(command)}'."
         )
+
     # if sys.platform == "win32":
     #     command = " ".join(command)
-   
+
     if sys.platform == "win32":
-        exec_process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=kwargs.get("stdout"),
-                stderr=kwargs.get("stderr"),
-                cwd=kwargs.get("cwd"),
-                env=kwargs.get("env"),
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-            )
+        import win32api
+        from unittest.mock import patch
+        command = " ".join(command)
+
+        # the kwargs that anyio.open_process uses to create the process
+        anyio_kwargs = ["stdout", "stderr", "cwd", "env"]
         
-        import anyio._backends._asyncio
-        stdout_stream = anyio._backends._asyncio.StreamReaderWrapper(exec_process.stdout) if exec_process.stdout else None
-        stderr_stream = anyio._backends._asyncio.StreamReaderWrapper(exec_process.stderr) if exec_process.stderr else None
-        process = anyio._backends._asyncio.Process(exec_process, _stdin=None, _stdout=stdout_stream, _stderr=stderr_stream)
+        # store a reference to asyncio.create_subprocess_exec to use 
+        # after patching
+        asyncio_create_subprocess = asyncio.create_subprocess_shell
+
+        async def create_subprocess(command, **kwargs):
+            # select only the kwargs that anyio.open_process uses to create the process
+            kwargs = {k: v for k, v in kwargs.items() if k in anyio_kwargs}
+            # add creationflags to kwargs
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+ 
+            return await asyncio_create_subprocess(
+                command,
+                **kwargs
+            )
+
+        with patch('asyncio.create_subprocess_shell', create_subprocess):
+            process = await anyio.open_process(command, **kwargs)
+            #add ctrl-c handler
+            handler = win32api.SetConsoleCtrlHandler(ctrl_c_handler(process), True)
     else:
         process = await anyio.open_process(command, **kwargs)
 
@@ -56,6 +86,12 @@ async def open_process(command: List[str], **kwargs):
     finally:
         try:
             process.terminate()
+
+            if sys.platform == "win32":
+                import win32api
+                # remove ctrl-c handler
+                win32api.SetConsoleCtrlHandler(handler, False)
+
         except ProcessLookupError:
             # Occurs if the process is already terminated
             pass
