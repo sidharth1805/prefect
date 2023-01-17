@@ -96,7 +96,11 @@ from prefect.utilities.asyncutils import (
     run_sync_in_worker_thread,
     sync_compatible,
 )
-from prefect.utilities.callables import parameters_to_args_kwargs
+from prefect.utilities.callables import (
+    collapse_variadic_parameters,
+    explode_variadic_parameter,
+    parameters_to_args_kwargs,
+)
 from prefect.utilities.collections import isiterable, visit_collection
 from prefect.utilities.hashing import stable_hash
 from prefect.utilities.pydantic import PartialModel
@@ -955,6 +959,9 @@ async def begin_task_map(
     # will also be tracked.
     parameters = await resolve_inputs(parameters, max_depth=1)
 
+    # Ensure that any parameters in kwargs are expanded before this check
+    parameters = explode_variadic_parameter(task.fn, parameters)
+
     iterable_parameters = {}
     static_parameters = {}
     annotated_parameters = {}
@@ -997,6 +1004,9 @@ async def begin_task_map(
         # Re-apply annotations to each key again
         for key, annotation in annotated_parameters.items():
             call_parameters[key] = annotation.rewrap(call_parameters[key])
+
+        # Collapse any previously exploded kwargs
+        call_parameters = collapse_variadic_parameters(task.fn, call_parameters)
 
         task_runs.append(
             partial(
