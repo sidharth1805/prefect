@@ -39,7 +39,7 @@ from prefect.orion.schemas.schedules import (
     IntervalSchedule,
     RRuleSchedule,
 )
-from prefect.settings import PREFECT_EXPERIMENTAL_ENABLE_WORK_POOLS, PREFECT_UI_URL
+from prefect.settings import PREFECT_UI_URL
 from prefect.states import Scheduled
 from prefect.utilities.asyncutils import run_sync_in_worker_thread
 from prefect.utilities.collections import listrepr
@@ -146,7 +146,7 @@ async def create_work_queue_and_set_concurrency_limit(
 
 
 async def check_work_pool_exists(work_pool_name: Optional[str]):
-    if work_pool_name is not None and PREFECT_EXPERIMENTAL_ENABLE_WORK_POOLS.value():
+    if work_pool_name is not None:
         async with get_client() as client:
             try:
                 await client.read_work_pool(work_pool_name=work_pool_name)

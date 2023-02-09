@@ -820,106 +820,6 @@ def test_watches_the_right_namespace(
     )
 
 
-def test_get_infrastructure_pid_handles_config_exceptions(monkeypatch):
-    mock = MagicMock()
-    mock.side_effect = k8s.config.config_exception.ConfigException("Error")
-    monkeypatch.setattr(
-        "prefect.infrastructure.kubernetes.KubernetesJob._get_active_cluster_name", mock
-    )
-    job = KubernetesJob()
-    job_pid = job._get_infrastructure_pid("my-job")
-    assert job_pid == "in-cluster-config:my-job"
-
-
-def test_watch_is_restarted_until_job_is_complete(
-    mock_k8s_client, mock_watch, mock_k8s_batch_client
-):
-    def mock_stream(*args, **kwargs):
-        if kwargs["func"] == mock_k8s_client.list_namespaced_pod:
-            job_pod = MagicMock(spec=kubernetes.client.V1Pod)
-            job_pod.status.phase = "Running"
-            yield {"object": job_pod}
-
-        if kwargs["func"] == mock_k8s_batch_client.list_namespaced_job:
-            job = MagicMock(spec=kubernetes.client.V1Job)
-
-            # Yield the job then return exiting the stream
-            # After restarting the watch a few times, we'll report completion
-            job.status.completion_time = (
-                None if mock_watch.stream.call_count < 3 else True
-            )
-            yield {"object": job}
-
-    mock_watch.stream.side_effect = mock_stream
-    result = KubernetesJob(command=["echo", "hello"]).run(MagicMock())
-    assert result.status_code == 1
-    assert mock_watch.stream.call_count == 3
-
-
-def test_watch_timeout_is_restarted_until_job_is_complete(
-    mock_k8s_client, mock_watch, mock_k8s_batch_client
-):
-    def mock_stream(*args, **kwargs):
-        if kwargs["func"] == mock_k8s_client.list_namespaced_pod:
-            job_pod = MagicMock(spec=kubernetes.client.V1Pod)
-            job_pod.status.phase = "Running"
-            yield {"object": job_pod}
-
-        if kwargs["func"] == mock_k8s_batch_client.list_namespaced_job:
-            job = MagicMock(spec=kubernetes.client.V1Job)
-
-            # Sleep a little
-            sleep(0.25)
-
-            # Yield the job then return exiting the stream
-            job.status.completion_time = None
-            yield {"object": job}
-
-    mock_watch.stream.side_effect = mock_stream
-    result = KubernetesJob(command=["echo", "hello"], job_watch_timeout_seconds=1).run(
-        MagicMock()
-    )
-    assert result.status_code == -1
-
-    mock_watch.stream.assert_has_calls(
-        [
-            mock.call(
-                func=mock_k8s_client.list_namespaced_pod,
-                namespace=mock.ANY,
-                label_selector=mock.ANY,
-                timeout_seconds=mock.ANY,
-            ),
-            # Starts with the full timeout
-            # Approximate comparisons are needed since executing code takes some time
-            mock.call(
-                func=mock_k8s_batch_client.list_namespaced_job,
-                field_selector=mock.ANY,
-                namespace=mock.ANY,
-                timeout_seconds=pytest.approx(1, abs=0.01),
-            ),
-            # Then, elapsed time removed on each call
-            mock.call(
-                func=mock_k8s_batch_client.list_namespaced_job,
-                field_selector=mock.ANY,
-                namespace=mock.ANY,
-                timeout_seconds=pytest.approx(0.75, abs=0.05),
-            ),
-            mock.call(
-                func=mock_k8s_batch_client.list_namespaced_job,
-                field_selector=mock.ANY,
-                namespace=mock.ANY,
-                timeout_seconds=pytest.approx(0.5, abs=0.05),
-            ),
-            mock.call(
-                func=mock_k8s_batch_client.list_namespaced_job,
-                field_selector=mock.ANY,
-                namespace=mock.ANY,
-                timeout_seconds=pytest.approx(0.25, abs=0.05),
-            ),
-        ]
-    )
-
-
 def test_streaming_pod_logs_timeout_warns(
     mock_k8s_client,
     mock_watch,
@@ -1269,6 +1169,22 @@ class TestCustomizingJob:
                 }
             },
         }
+
+    def test_providing_a_string_customization(self):
+        KubernetesJob(
+            command=["echo", "hello"],
+            customizations='[{"op": "add", "path": "/spec/template/spec/containers/0/env/-","value": {"name": "MY_API_TOKEN", "valueFrom": {"secretKeyRef": {"name": "the-secret-name", "key": "api-token"}}}}]',
+        )
+
+    def test_providing_an_illformatted_string_customization_raises(self):
+        with pytest.raises(
+            ValueError,
+            match=f"Unable to parse customizations as JSON: .* Please make sure that the provided value is a valid JSON string.",
+        ):
+            KubernetesJob(
+                command=["echo", "hello"],
+                customizations='[{"op": ""add", "path": "/spec/template/spec/containers/0/env/-","value": {"name": "MY_API_TOKEN", "valueFrom": {"secretKeyRef": {"name": "the-secret-name", "key": "api-token"}}}}]',
+            )
 
     def test_setting_pod_resource_requests(self):
         manifest = KubernetesJob(

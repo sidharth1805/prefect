@@ -289,13 +289,17 @@ class ORMArtifact:
     @declared_attr
     def task_run_id(cls):
         return sa.Column(
-            UUID(), sa.ForeignKey("task_run.id"), nullable=True, index=True
+            UUID(),
+            nullable=True,
+            index=True,
         )
 
     @declared_attr
     def flow_run_id(cls):
         return sa.Column(
-            UUID(), sa.ForeignKey("flow_run.id"), nullable=True, index=True
+            UUID(),
+            nullable=True,
+            index=True,
         )
 
     type = sa.Column(sa.String)
@@ -1161,74 +1165,6 @@ class ORMWorkPool:
     @declared_attr
     def __table_args__(cls):
         return (sa.UniqueConstraint("name"),)
-
-
-@declarative_mixin
-class ORMWorkPoolQueue:
-    """SQLAlchemy model of a Worker Queue"""
-
-    name = sa.Column(sa.String, nullable=False)
-    description = sa.Column(sa.String)
-
-    @declared_attr
-    def work_pool_id(cls):
-        return sa.Column(
-            UUID,
-            sa.ForeignKey("work_pool.id", ondelete="cascade"),
-            nullable=False,
-            index=True,
-        )
-
-    is_paused = sa.Column(sa.Boolean, nullable=False, server_default="0", default=False)
-    concurrency_limit = sa.Column(
-        sa.Integer,
-        nullable=True,
-    )
-    priority = sa.Column(sa.Integer, index=True, nullable=False)
-
-    @declared_attr
-    def __table_args__(cls):
-        return (sa.UniqueConstraint("work_pool_id", "name"),)
-
-    @declared_attr
-    def work_pool(cls):
-        return sa.orm.relationship(
-            "WorkPool",
-            lazy="joined",
-            foreign_keys=[cls.work_pool_id],
-        )
-
-    @declared_attr
-    def work_pool(cls):
-        return sa.orm.relationship(
-            "WorkPool",
-            lazy="joined",
-            foreign_keys=[cls.work_pool_id],
-        )
-
-    @declared_attr
-    def work_pool(cls):
-        return sa.orm.relationship(
-            "WorkPool",
-            lazy="joined",
-            foreign_keys=[cls.work_pool_id],
-        )
-
-    @declared_attr
-    def work_pool(cls):
-        return sa.orm.relationship(
-            "WorkPool",
-            lazy="joined",
-            foreign_keys=[cls.work_pool_id],
-        )
-
-    @declared_attr
-    def work_pool(cls):
-        return sa.orm.relationship(
-            "WorkPool",
-            lazy="joined",
-            foreign_keys=[cls.work_pool_id],
-        )
 
 
 @declarative_mixin
