@@ -220,7 +220,7 @@ def print_as_log(*args, **kwargs):
     print(*args, **kwargs)
 
     # Remove trailing whitespace to prevent duplicates
-    logger.info(buffer.getvalue().rstrip(), stacklevel=2)
+    logger.info(buffer.getvalue().rstrip(), stacklevel=4)
 
 
 @contextmanager
