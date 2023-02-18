@@ -1,6 +1,8 @@
 import asyncio
+import inspect
 import json
 import logging
+import os
 import queue
 import sys
 import threading
@@ -1430,6 +1432,8 @@ def test_patch_print_writes_to_logger_with_task_run_context(caplog, capsys, task
         if record.message == "foo":
             break
 
+    assert record.filename == os.path.basename(__file__)
+    assert record.funcName == inspect.stack()[0][3]
     assert record.levelname == "INFO"
     assert record.name == "prefect.task_runs"
     assert record.task_run_id == str(task_run.id)
@@ -1452,6 +1456,8 @@ def test_patch_print_writes_to_logger_with_flow_run_context(caplog, capsys, flow
         if record.message == "foo":
             break
 
+    assert record.filename == os.path.basename(__file__)
+    assert record.funcName == inspect.stack()[0][3]
     assert record.levelname == "INFO"
     assert record.name == "prefect.flow_runs"
     assert record.flow_run_id == str(flow_run.id)
