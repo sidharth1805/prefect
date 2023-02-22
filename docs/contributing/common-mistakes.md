@@ -83,19 +83,28 @@ Python can display more of the stack trace where the connection was opened.
 
   
 
-If you facing a timeout error when running pytest it is most likely that you need to change the timeout seconds
+If you are facing a timeout error when running pytest it is most likely that you need to change the timeout seconds at configuration file.
 
 You'll see a failure like:
 
-```
-tests\test_context.py
+```bash
+pytest tests/test_context.py
 ++++++++++++++++++++++++++++++++++++++++++ Timeout ++++++++++++++++++++++++++++++++++++++++++
 ```
   
 To resolve this, go to the config file
   
-  ```bash
- prefect\setup.cfg
+```
+ prefect/setup.cfg
+
 ```
 
-Now change the timeout value, the default value is set to `timeout = 60`  seconds . You will be needing to increase the value.
+Now change the timeout value, the default value is set to `timeout = 60`  seconds . You will be needed to increase the value.
+
+```
+[tool:pytest]
+
+asyncio_mode = auto
+timeout = 60
+
+```
